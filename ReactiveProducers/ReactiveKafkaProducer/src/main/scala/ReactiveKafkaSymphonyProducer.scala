@@ -26,8 +26,10 @@ object ReactiveKafkaSymphonyProducer extends App {
 
   val config = ConfigFactory.load()
   val bootstrapServers = config.getOrElse("bootstrapServers", "").toOption.fold("")(identity(_))
+  val symphonyHost = config.getOrElse("symphonyHost", "").toOption.fold("")(identity(_))
 
   println(s"Using bootstrap servers: ${bootstrapServers}")
+  println(s"Fetching records from: ${symphonyHost}")
 
   val keyfile = if (args.size < 1) Failure(new Exception) else Success(args(0))
   val local = if (args.size < 2) None else Some(args(1))
@@ -66,13 +68,18 @@ object ReactiveKafkaSymphonyProducer extends App {
   keyfile.map { file =>
     local match{
       case None => {
+//        To be run when testing with a local file of pre-dumped records
         (s"cat ${file}").run(processIO)
       }
       case Some(e) => {
         if (e == "symphony")
-          s"ssh -K sirsi@morison.stanford.edu /s/SUL/Bin/LD4P/catDump.sh ${file}".run(processIO)
+//          To be run via the jar file on the symphony box
+          s"/s/SUL/Bin/LD4P/catDump.sh ${file}".run(processIO)
+        else if (e == "ssh")
+//          To be run on local machine with .k5login permissions to ssh to symphony
+          s"ssh -K sirsi@${symphonyHost} /s/SUL/Bin/LD4P/catDump.sh ${file}".run(processIO)
         else
-          println("Any second argument will do, but usage should really be: ReactiveKafkaSymphonyProducer [ckey_file] symphony")
+          println("Second argument must be: ReactiveKafkaSymphonyProducer [ckey_file] [symphony | ssh]")
       }
     }
   }.recover {
